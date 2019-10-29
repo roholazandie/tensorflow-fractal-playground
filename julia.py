@@ -31,7 +31,6 @@ def gen_julia(Z, c, bg_ratio, ratio):
             zs.assign(zs_),
             ns.assign_add(tf.cast(not_diverged, tf.float32))
         )
-
         for i in range(ITER_NUM):
             step.run()
         final_step = ns.eval()
