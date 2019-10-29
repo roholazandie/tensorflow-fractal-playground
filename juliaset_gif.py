@@ -1,95 +1,76 @@
 import numpy as np
 import tensorflow as tf
-from PIL import Image
-from moviepy.editor import ImageSequenceClip
-import os
+from utils import gif, mp4, create_image
+from tqdm import tqdm
 
 R = 4
-ITER_NUM = 200
-
-def gif(filename, array, fps=10, scale=1.0):
-    """Creates a gif given a stack of images using moviepy
-    Notes
-    -----
-    works with current Github version of moviepy (not the pip version)
-    https://github.com/Zulko/moviepy/commit/d4c9c37bc88261d8ed8b5d9b7c317d13b2cdf62e
-    Usage
-    -----
-    >>> X = randn(100, 64, 64)
-    >>> gif('test.gif', X)
-    Parameters
-    ----------
-    filename : string
-        The filename of the gif to write to
-    array : array_like
-        A numpy array that contains a sequence of images
-    fps : int
-        frames per second (default: 10)
-    scale : float
-        how much to rescale each image by (default: 1.0)
-    """
-
-    # ensure that the file has the .gif extension
-    fname, _ = os.path.splitext(filename)
-    filename = fname + '.gif'
-
-    # copy into the color dimension if the images are black and white
-    if array.ndim == 3:
-        array = array[..., np.newaxis] * np.ones(3)
-
-    # make the moviepy clip
-    clip = ImageSequenceClip(list(array), fps=fps).resize(scale)
-    clip.write_gif(filename, fps=fps)
-    return clip
+n_iteration = 200
 
 
+# @tf.function
+# def julia_set(zs, ns, phase):
+#     for _ in range(n_iteration):
+#         zs = tf.where(tf.abs(zs) < R, zs ** 2 + 0.7885 * tf.cast(tf.exp(phase), tf.complex64), zs)
+#         not_diverged = tf.abs(zs) < R
+#         ns = ns + tf.cast(not_diverged, tf.float32)
+#     return ns, zs
 
-def color(z, i):
-    # From: https://www.reddit.com/r/math/comments/2abwyt/smooth_colour_mandelbrot/
-    if abs(z) < R:
-        return 0, 0, 0
-    v = np.log2(i + R - np.log2(np.log2(abs(z)))) / 5
-    if v < 1.0:
-        return v**4, v**2.5, v
-    else:
-        v = max(0, 2 - v)
-        return v, v**1.5, v**3
-
-def julia_set(Z, p):
-    xs = tf.constant(Z.astype(np.complex64))
-    zs = tf.Variable(xs)
-
-    ns = tf.Variable(tf.zeros_like(xs, tf.float32))
-
-    for i in range(ITER_NUM):
-        zs = tf.where(tf.abs(zs) < R, zs**2 + 0.7885*tf.cast(tf.exp(p), tf.complex64), zs)
+def julia_set(Z, phase):
+    zs = tf.Variable(Z)
+    ns = tf.Variable(tf.zeros_like(Z, tf.float32))
+    for _ in range(n_iteration):
+        zs = tf.where(tf.abs(zs) < R, zs ** 2 + 0.7885 * tf.cast(tf.exp(phase), tf.complex64), zs)
         not_diverged = tf.abs(zs) < R
         ns = ns + tf.cast(not_diverged, tf.float32)
+    return ns, zs
 
-    final_step = ns.numpy()
-    final_z = zs.numpy()
 
-    r, g, b = np.frompyfunc(color, 2, 3)(final_z, final_step)
-    img_array = np.dstack((r, g, b))
-    return Image.fromarray(np.uint8(img_array * 255))
+def julia_set_np(zs, phase):
+    ns = np.zeros_like(Z, dtype=np.float32)
+    for i in range(n_iteration):
+        zs = np.where(np.abs(zs) < R, zs**2 + 0.7885 * np.exp(phase).astype(np.complex64), zs)
+        not_diverged = np.abs(zs) < R
+        ns = ns + not_diverged.astype(np.float32)
+
+    return ns, zs
+
 
 if __name__ == "__main__":
+    n = 2
     start_x = -2.5  # x range
     end_x = 2.5
     start_y = -2.5  # y range
     end_y = 2.5
-    width = 1000  # image width
+    width = 3000  # image width
     step = (end_x - start_x) / width
     Y, X = np.mgrid[start_y:end_y:step, start_x:end_x:step]
     Z = X + 1j * Y
+    Z = Z.astype(np.complex64)
 
-    n = 30
+    import time
+    t1 = time.time()
     seqs = np.zeros([n] + list(Z.shape) + [3])
-    for i, p in enumerate(np.linspace(0, 2*np.pi, n)):
-        print(i, p)
-        p = tf.Variable(1j * p)
-        img = julia_set(Z, p)
+    for i, phase in enumerate(tqdm(np.linspace(0, 2 * np.pi, n))):
+        phase = tf.Variable(1j * phase)
+        ns, zs = julia_set(Z, phase)
+        final_step = ns.numpy()
+        final_z = zs.numpy()
+        img = create_image(final_z, final_step, R)
         seqs[i, :, :] = np.array(img)
+    t2 = time.time()
+    #gif('julia', seqs, 8)
+    mp4('julia', seqs, 8)
 
+    t3 = time.time()
+    seqs = np.zeros([n] + list(Z.shape) + [3])
+    for i, phase in enumerate(tqdm(np.linspace(0, 2 * np.pi, n))):
+        ns, zs = julia_set_np(Z, 1j*phase)
+        final_step = ns
+        final_z = zs
+        img = create_image(final_z, final_step, R)
+        seqs[i, :, :] = np.array(img)
+    t4 = time.time()
+    mp4('julianp', seqs, 8)
 
-    gif('julia.gif', seqs, 8)
+    print(t2-t1)
+    print(t4-t3)
