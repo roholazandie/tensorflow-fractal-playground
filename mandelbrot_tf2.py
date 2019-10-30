@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from PIL import Image
+from utils import create_image
 
 R = 4
 ITER_NUM = 200
@@ -17,22 +18,15 @@ def color(z, i):
         return v, v**1.5, v**3
 
 def mandelbrot(Z):
-    xs = tf.constant(Z.astype(np.complex64))
+    xs = tf.constant(Z)
     zs = tf.Variable(xs)
-
     ns = tf.Variable(tf.zeros_like(xs, tf.float32))
 
     for i in range(ITER_NUM):
         zs = tf.where(tf.abs(zs) < R, zs**2 + xs, zs)
         not_diverged = tf.abs(zs) < R
         ns = ns + tf.cast(not_diverged, tf.float32)
-
-    final_step = ns.numpy()
-    final_z = zs.numpy()
-
-    r, g, b = np.frompyfunc(color, 2, 3)(final_z, final_step)
-    img_array = np.dstack((r, g, b))
-    return Image.fromarray(np.uint8(img_array * 255))
+    return zs, ns
 
 if __name__ == "__main__":
     start_x = -2.5  # x range
@@ -44,5 +38,11 @@ if __name__ == "__main__":
     Y, X = np.mgrid[start_y:end_y:step, start_x:end_x:step]
     #Y, X = tf.meshgrid(tf.range(start_y, end_y, step), tf.range(start_x, end_x, step))
     Z = X + 1j * Y
-    img = mandelbrot(Z)
-    img.save('mandelbrot.png')
+    Z = Z.astype(np.complex64)
+
+    zs, ns = mandelbrot(Z)
+    final_step = ns.numpy()
+    final_z = zs.numpy()
+
+    img = create_image(final_z, final_step, R)
+    img.save('img/mandelbrot.png')

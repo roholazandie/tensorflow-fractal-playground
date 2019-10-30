@@ -76,7 +76,7 @@ if __name__ == "__main__":
         seqs[i, :, :] = np.array(img)
     t2 = time.time()
     #gif('julia', seqs, 8)
-    mp4('juliatf', seqs, 8)
+    mp4('img/juliatf', seqs, 8)
 
     t3 = time.time()
     seqs = np.zeros([n] + list(Z.shape) + [3])
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         img = create_image(final_z, final_step, R)
         seqs[i, :, :] = np.array(img)
     t4 = time.time()
-    mp4('julianp', seqs, 8)
+    mp4('img/julianp', seqs, 8)
 
 
     Z = cp.array(Z)
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         img = create_image(final_z, final_step, R)
         seqs[i, :, :] = np.array(img)
     t6 = time.time()
-    mp4('juliacp', seqs, 8)
+    mp4('img/juliacp', seqs, 8)
 
     print(t2 - t1)
     print(t4 - t3)

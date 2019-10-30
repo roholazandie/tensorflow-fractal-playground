@@ -1,3 +1,4 @@
 tensorflow-gpu
 pillow
 moviepy
+cupy
